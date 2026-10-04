@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cuda.h>
+#include <cuda_runtime.h>
 
 #define CUDA_CALL(exp)                                       \
     do {                                                     \
