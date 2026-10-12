@@ -40,19 +40,56 @@ void opposing_sort( element_t * data, std::size_t invert_at_pos, std::size_t num
 {
     int const th_id = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if( th_id < num_elements )
-    {
-        // IMPLEMENT ME!
+    if( th_id >= num_elements )
         return;
+    
+    //MAIN FOR LOOP: RUN UP THE STRIDE
+    for (std::size_t stride = 1; stride < num_elements; stride <<= 1)
+    {
+        //INNER FOR LOOP: WALK DOWN FROM THE STRIDE TO ZERO TO SWAP ACCORDINGLY
+        for (std::size_t meta_stride = stride; meta_stride > 0; meta_stride >>= 1) //count down the stride back to 1 every time we bump it up
+        {
+            if (th_id % (meta_stride * 2) < meta_stride) //this element will try to swap with index i + stride.
+            {
+                if (th_id / (stride * 2) % 2 == 0 && !(stride >= num_elements / 2 && th_id >= invert_at_pos)) //determine whether we are swapping for largest or smallest, plus a clause so it sorts backwards in the last quarter.
+                {
+                    //smallest first
+                    if (data[th_id] > data[th_id + meta_stride])
+                    {
+                        element_t temp = data[th_id];
+                        data[th_id] = data[th_id + meta_stride];
+                        data[th_id + meta_stride] = temp;
+                    }
+                }
+                else
+                {
+                    //largest first
+                    if (data[th_id] < data[th_id + meta_stride])
+                    {
+                        element_t temp = data[th_id];
+                        data[th_id] = data[th_id + meta_stride];
+                        data[th_id + meta_stride] = temp;
+                    }
+                }
+            }
+            __syncthreads();
+        }
     }
 }
+
+__global__
+void radix_sort(element_t* dataIn, element_t* dataOut, std::size_t num_elements)
+{
+
+}
+
 
 /**
  * Performs all the logic of allocating device vectors and copying host/input
  * vectors to the device. Times the opposing_sort() kernel with wall time,
  * but excludes set up and tear down costs such as mallocs, frees, and memcpies.
  */
-void run_gpu_soln( std::vector< element_t > data, std::size_t switch_at, std::size_t n )
+std::vector< element_t > run_gpu_soln( std::vector< element_t > data, std::size_t switch_at, std::size_t n )
 {
     // Kernel launch configurations. Feel free to change these.
     // This is set to maximise the size of a thread block on a T4, but it hasn't
@@ -90,6 +127,55 @@ void run_gpu_soln( std::vector< element_t > data, std::size_t switch_at, std::si
               << " ns" << std::endl;
 
     for( auto const x : data ) std::cout << x << " "; std::cout << std::endl;
+
+    return data;
+}
+
+std::vector< element_t > run_gpu_radix(std::vector< element_t > data, std::size_t n)
+{
+    // Kernel launch configurations. Feel free to change these.
+    // This is set to maximise the size of a thread block on a T4, but it hasn't
+    // been tuned. It's not known if this is optimal.
+    std::size_t const threads_per_block = 1024;
+    std::size_t const num_blocks = (n + threads_per_block - 1) / threads_per_block;
+
+    // Allocate arrays on the device/GPU
+    element_t* d_dataIn;
+    cudaMalloc((void**)&d_dataIn, sizeof(element_t) * n);
+    CHECK_ERROR("Allocating input array on device");
+
+    element_t* d_dataOut;
+    cudaMalloc((void**)&d_dataOut, sizeof(element_t) * n);
+    CHECK_ERROR("Allocating input array on device");
+
+    // Copy the input from the host to the device/GPU
+    cudaMemcpy(d_dataIn, data.data(), sizeof(element_t) * n, cudaMemcpyHostToDevice);
+    CHECK_ERROR("Copying input array to device");
+
+    //// Warm the cache on the GPU for a more fair comparison
+    //warm_the_gpu << < num_blocks, threads_per_block >> > (d_dataIn, d_dataOut, n);
+
+    // Time the execution of the kernel that you implemented
+    auto const kernel_start = std::chrono::high_resolution_clock::now();
+    radix_sort << < num_blocks, threads_per_block >> > (d_dataIn, d_dataOut, n);
+    auto const kernel_end = std::chrono::high_resolution_clock::now();
+    CHECK_ERROR("Executing kernel on device");
+
+    // After the timer ends, copy the result back, free the device vector,
+    // and echo out the timings and the results.
+    cudaMemcpy(data.data(), d_dataOut, sizeof(element_t) * n, cudaMemcpyDeviceToHost);
+    CHECK_ERROR("Transferring result back to host");
+    cudaFree(d_dataIn);
+    cudaFree(d_dataOut);
+    CHECK_ERROR("Freeing device memory");
+
+    std::cout << "GPU Radix Solution time: "
+        << std::chrono::duration_cast<std::chrono::nanoseconds>(kernel_end - kernel_start).count()
+        << " ns" << std::endl;
+
+    for (auto const x : data) std::cout << x << " "; std::cout << std::endl;
+
+    return data;
 }
 
 } // namespace gpu

@@ -30,7 +30,7 @@ void opposing_sort( element_t * data, std::size_t invert_at_pos, std::size_t num
  * the functions takes the input by value so as to not perturb the original data
  * in place.
  */
-void run_cpu_baseline( std::vector< element_t > data, std::size_t switch_at, std::size_t n )
+std::vector< element_t > run_cpu_baseline( std::vector< element_t > data, std::size_t switch_at, std::size_t n )
 {
     auto const cpu_start = std::chrono::high_resolution_clock::now();
     opposing_sort( data.data(), switch_at, n );
@@ -41,6 +41,8 @@ void run_cpu_baseline( std::vector< element_t > data, std::size_t switch_at, std
               << " ns" << std::endl;
 
     for( auto const x : data ) std::cout << x << " "; std::cout << std::endl;
+
+    return data;
 }
 
 } // namespace cpu
