@@ -16,6 +16,7 @@ std::vector< element_t > run_cpu_baseline( std::vector< element_t > data, std::s
 namespace gpu {
 
 std::vector< element_t > run_gpu_soln( std::vector< element_t > data, std::size_t switch_at, std::size_t n );
+std::vector< element_t > run_gpu_radix( std::vector< element_t > data, std::size_t n, std::size_t max_digits );
 
 } // namespace gpu
 } // namespace a1
