@@ -14,12 +14,13 @@
 
 int main()
 {
-    std::size_t const n = 4;
+    std::size_t const n = 32;
     std::size_t const switch_at = 3 * ( n >> 2 ) ;
 
     auto data = csc485b::a1::generate_uniform< element_t >( n );
     csc485b::a1::cpu::run_cpu_baseline( data, switch_at, n );
     csc485b::a1::gpu::run_gpu_soln( data, switch_at, n );
+    //csc485b::a1::gpu::run_gpu_radix_soln( data, n );
 
     return EXIT_SUCCESS;
 }
