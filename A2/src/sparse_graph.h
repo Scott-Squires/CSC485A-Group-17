@@ -34,6 +34,7 @@ __global__
 void build_graph( SparseGraph g, edge_t const * edge_list, std::size_t m )
 {
     // IMPLEMENT ME!
+    // TODO: Important to get a 60%
     return;
 }
 
@@ -48,6 +49,12 @@ void two_hop_reachability( SparseGraph g )
     // algorithm unknown
     return;
 }
+
+inline void run_two_hop( SparseGraph g )
+{
+    two_hop_reachability<<< 1, 1 >>>( g );  // placeholder until you write sparse
+}
+
 
 } // namespace gpu
 } // namespace a2

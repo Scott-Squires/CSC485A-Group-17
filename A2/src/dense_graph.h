@@ -36,7 +36,17 @@ namespace gpu {
 __global__
 void build_graph( DenseGraph g, edge_t const * edge_list, std::size_t m )
 {
-    // IMPLEMENT ME!
+    // IMPLEMENT ME! DONE!
+    size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
+
+    if ( th_id >= m) {
+        return; // thread is larger than number of edge list entries and is not needed.
+    }
+
+    int2 edge = edge_list[th_id];
+    size_t n = g.n; // number of rows/columns
+    g.adjacencyMatrix[edge.x * n + edge.y] = 1;
+    g.adjacencyMatrix[edge.y * n + edge.x] = 1;
     return;
 }
 
@@ -45,12 +55,52 @@ void build_graph( DenseGraph g, edge_t const * edge_list, std::size_t m )
   * the two-hop neighbourhood of input graph g
   */
 __global__
-void two_hop_reachability( DenseGraph g )
+void two_hop_reachability( DenseGraph g, node_t * out)
 {
-    // IMPLEMENT ME!
+    // IMPLEMENT ME! Nieve DONE!
     // square adjacencyMatrix
+
+    // TODO: write seprate functions and use this as a benchmark,
+
+    size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
+
+    size_t row = th_id / g.n;
+    size_t col = th_id % g.n;
+
+    if (th_id >= g.n * g.n) {
+        return;
+    }
+
+    int result = 0;
+
+    for (size_t i = 0; i < g.n; i++) {
+        result += g.adjacencyMatrix[row * g.n + i] * g.adjacencyMatrix[i * g.n + col];
+    }
+
+
     // then remove the diagonal and clamp values back to [0,1]
+    if (row == col) {
+        result = 0;
+    } else if (result > 1) {
+        result = 1;
+    }
+
+    out[row * g.n + col] = result;
+
     return;
+}
+
+inline void run_two_hop( DenseGraph g )
+{
+    node_t * d_out;
+    cudaMalloc( (void**)&d_out, sizeof( node_t ) * g.matrix_size() );
+
+    std::size_t const threads = 256;
+    std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads;
+    two_hop_reachability<<< blocks, threads >>>( g, d_out );
+
+    cudaMemcpy( g.adjacencyMatrix, d_out, sizeof( node_t ) * g.matrix_size(), cudaMemcpyDeviceToDevice );
+    cudaFree( d_out );
 }
 
 } // namespace gpu
