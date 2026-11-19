@@ -90,14 +90,90 @@ void two_hop_reachability( DenseGraph g, node_t * out)
     return;
 }
 
+
+__global__
+void two_hop_tiled( DenseGraph g, node_t * out)
+{
+    // IMPLEMENT ME! tiled! DO TILING look at slides and stuff
+
+
+    // TODO: write seprate functions and use this as a benchmark,
+
+    size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
+
+    size_t row = th_id / g.n;
+    size_t col = th_id % g.n;
+
+    if (th_id >= g.n * g.n) {
+        return;
+    }
+
+    int result = 0;
+
+    for (size_t i = 0; i < g.n; i++) {
+        result += g.adjacencyMatrix[row * g.n + i] * g.adjacencyMatrix[i * g.n + col];
+    }
+
+
+    // then remove the diagonal and clamp values back to [0,1]
+    if (row == col) {
+        result = 0;
+    } else if (result > 1) {
+        result = 1;
+    }
+
+    out[row * g.n + col] = result;
+
+    return;
+}
+
+
+__global__
+void two_hop_warp_optimizations( DenseGraph g, node_t * out)
+{
+    // IMPLEMENT ME! warp primitives + bit-packing! __popc and __any_sync
+
+    size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
+
+    size_t row = th_id / g.n;
+    size_t col = th_id % g.n;
+
+    if (th_id >= g.n * g.n) {
+        return;
+    }
+
+    int result = 0;
+
+    for (size_t i = 0; i < g.n; i++) {
+        result += g.adjacencyMatrix[row * g.n + i] * g.adjacencyMatrix[i * g.n + col];
+    }
+
+
+    // then remove the diagonal and clamp values back to [0,1]
+    if (row == col) {
+        result = 0;
+    } else if (result > 1) {
+        result = 1;
+    }
+
+    out[row * g.n + col] = result;
+
+    return;
+}
+
+
+
 inline void run_two_hop( DenseGraph g )
 {
+
     node_t * d_out;
     cudaMalloc( (void**)&d_out, sizeof( node_t ) * g.matrix_size() );
 
     std::size_t const threads = 256;
     std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads;
     two_hop_reachability<<< blocks, threads >>>( g, d_out );
+    two_hop_tiled<<< blocks, threads >>>( g, d_out );
+    two_hop_warp_optimizations<<< blocks, threads >>>( g, d_out );
 
     cudaMemcpy( g.adjacencyMatrix, d_out, sizeof( node_t ) * g.matrix_size(), cudaMemcpyDeviceToDevice );
     cudaFree( d_out );
