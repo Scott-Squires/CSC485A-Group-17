@@ -96,14 +96,61 @@ void two_hop_reachability( DenseGraph g, node_t * out)
     return;
 }
 
+/**
+  * Repopulates the adjacency matrix as a new graph that represents
+  * the two-hop neighbourhood of input graph g. Each output cell is
+  * mapped to one warp.
+  */
+__global__
+void two_hop_reachability_bminus(DenseGraph g, node_t* out)
+{
+    // IMPLEMENT ME! Nieve DONE!
+    // square adjacencyMatrix
+
+    // TODO: write seprate functions and use this as a benchmark,
+
+    size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
+
+    size_t cell_id = th_id / 32;
+    size_t warp_th_id = th_id % 32;
+
+    size_t row = cell_id / g.n;
+    size_t col = cell_id % g.n;
+
+    if (th_id >= g.n * g.n * 32) {
+        return;
+    }
+
+    int result = 0;
+
+    for (size_t i = 0; i < g.n; i += 32) {
+        if (i + warp_th_id < g.n)
+            result += g.adjacencyMatrix[row * g.n + i + warp_th_id] * g.adjacencyMatrix[(i + warp_th_id) * g.n + col];
+    }
+
+
+    // then remove the diagonal and clamp values back to [0,1]
+    if (row == col) {
+        result = 0;
+    }
+    else if (result > 1) {
+        result = 1;
+    }
+
+    if (result > 0)
+        out[row * g.n + col] = result;
+
+    return;
+}
+
 inline void run_two_hop( DenseGraph g )
 {
     node_t * d_out;
     cudaMalloc( (void**)&d_out, sizeof( node_t ) * g.matrix_size() );
 
     std::size_t const threads = 256;
-    std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads;
-    two_hop_reachability<<< blocks, threads >>>( g, d_out );
+    std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads * 32;
+    two_hop_reachability_bminus <<< blocks, threads >>>( g, d_out );
 
     cudaMemcpy( g.adjacencyMatrix, d_out, sizeof( node_t ) * g.matrix_size(), cudaMemcpyDeviceToDevice );
     cudaFree( d_out );
