@@ -28,7 +28,7 @@ edge_list_t generate_graph( std::size_t n, std::size_t m )
 
     // for details of random number generation, see:
     // https://en.cppreference.com/w/cpp/numeric/random/uniform_int_distribution
-    std::size_t random_seed = 20241008;  // use magic seed
+    std::size_t random_seed = 1231231245;  // use magic seed
     std::mt19937 rng( random_seed );     // use mersenne twister generator
     std::uniform_int_distribution<> distrib(0, 100);
 

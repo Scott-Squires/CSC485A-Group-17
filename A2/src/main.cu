@@ -25,8 +25,7 @@ void run( DeviceGraph g, csc485b::a2::edge_t const * d_edges, std::size_t m )
     cudaDeviceSynchronize();
     auto const build_start = std::chrono::high_resolution_clock::now();
 
-    // this code doesn't work yet!
-    csc485b::a2::gpu::build_graph<<< (m + 255) / 256, 256 >>>( g, d_edges, m ); // NOTE: this matrix isnt zeroed before hand and could potentially have stray data.
+    csc485b::a2::gpu::build_graph( g, d_edges, m ); // NOTE: this matrix isnt zeroed before hand and could potentially have stray data.
 
     cudaDeviceSynchronize();
     auto const reachability_start = std::chrono::high_resolution_clock::now();
@@ -119,16 +118,37 @@ void run_dense( csc485b::a2::edge_t const * d_edges, std::size_t n, std::size_t 
     a2::DenseGraph dg{ n, host_matrix.data() };
     cudaMemcpy( dg.adjacencyMatrix, d_dg.adjacencyMatrix, sizeof( a2::node_t ) * d_dg.matrix_size(), cudaMemcpyDeviceToHost );
     std::cout << "Dense wrong cells: " << count_mismatches( host_matrix, expected ) << " / " << n * n << std::endl;
-    std::copy( host_matrix.cbegin(), host_matrix.cend(), std::ostream_iterator< a2::node_t >( std::cout, " " ) );
+    //std::copy( host_matrix.cbegin(), host_matrix.cend(), std::ostream_iterator< a2::node_t >( std::cout, " " ) );
     std::cout << "\n" << std::endl;
     print_square_matrix(host_matrix, n);
-
-
 
     // clean up
     cudaFree( d_matrix );
 }
 
+//prints out our sparse graph for verification
+void print_sparse_graph(csc485b::a2::SparseGraph g)
+{
+    std::vector< csc485b::a2::node_t > nsa(g.n);
+    std::vector< csc485b::a2::node_t > n(g.m);
+    cudaMemcpy(nsa.data(), g.neighbours_start_at, sizeof(csc485b::a2::node_t) * g.n, cudaMemcpyDeviceToHost);
+    cudaMemcpy(n.data(), g.neighbours, sizeof(csc485b::a2::node_t) * g.m, cudaMemcpyDeviceToHost);
+
+
+    std::cout << std::endl << "Neighbours start at: [";
+    for (int i = 0; i < g.n; i++)
+    {
+        std::cout << nsa[i] << ", ";
+    }
+    std::cout << "]" << std::endl;
+
+    std::cout << "Neighbours: [";
+    for (int i = 0; i < g.m; i++)
+    {
+        std::cout << n[i] << ", ";
+    }
+    std::cout << "]" << std::endl;
+}
 
 /**
  * Allocates space for a sparse graph and then runs the test code on it.
@@ -145,6 +165,8 @@ void run_sparse( csc485b::a2::edge_t const * d_edges, std::size_t n, std::size_t
 
     run( d_sg, d_edges, m );
 
+    //print_sparse_graph(d_sg);
+
     // clean up
     cudaFree( d_neighbours );
     cudaFree( d_offsets );
@@ -156,7 +178,7 @@ int main()
 
     // Create input
     std::size_t constexpr n = 64;
-    std::size_t constexpr expected_degree = n >> 1;
+    std::size_t constexpr expected_degree = n >> 6;
 
     a2::edge_list_t const graph = a2::generate_graph( n, n * expected_degree );
     std::size_t const m = graph.size();

@@ -1,6 +1,7 @@
 /**
  * The file in which you will implement your DenseGraph GPU solutions!
  */
+#pragma once
 
 #include <cstddef>  // std::size_t type
 
@@ -34,7 +35,7 @@ namespace gpu {
  * @pre The pointers in DenseGraph g have already been allocated.
  */
 __global__
-void build_graph( DenseGraph g, edge_t const * edge_list, std::size_t m )
+void build_graph_gpu( DenseGraph g, edge_t const * edge_list, std::size_t m )
 {
     // IMPLEMENT ME! DONE!
     size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
@@ -48,6 +49,11 @@ void build_graph( DenseGraph g, edge_t const * edge_list, std::size_t m )
     g.adjacencyMatrix[edge.x * n + edge.y] = 1;
     g.adjacencyMatrix[edge.y * n + edge.x] = 1;
     return;
+}
+
+void build_graph(DenseGraph g, edge_t const* edge_list, std::size_t m)
+{
+    csc485b::a2::gpu::build_graph_gpu << < (m + 255) / 256, 256 >> > (g, edge_list, m);
 }
 
 /**

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <cuda.h>
+#include <cuda_runtime.h> // __global__/__device__, cudaMalloc etc. (nvcc auto-includes this, IntelliSense doesn't)
 
 #define CUDA_CALL(exp)                                       \
     do {                                                     \
