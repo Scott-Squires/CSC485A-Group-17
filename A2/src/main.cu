@@ -119,7 +119,7 @@ void run_dense( csc485b::a2::edge_t const * d_edges, std::size_t n, std::size_t 
     a2::DenseGraph dg{ n, host_matrix.data() };
     cudaMemcpy( dg.adjacencyMatrix, d_dg.adjacencyMatrix, sizeof( a2::node_t ) * d_dg.matrix_size(), cudaMemcpyDeviceToHost );
     std::cout << "Dense wrong cells: " << count_mismatches( host_matrix, expected ) << " / " << n * n << std::endl;
-    std::copy( host_matrix.cbegin(), host_matrix.cend(), std::ostream_iterator< a2::node_t >( std::cout, " " ) );
+    //std::copy( host_matrix.cbegin(), host_matrix.cend(), std::ostream_iterator< a2::node_t >( std::cout, " " ) );
     std::cout << "\n" << std::endl;
     print_square_matrix(host_matrix, n);
 
@@ -155,17 +155,17 @@ int main()
     using namespace csc485b;
 
     // Create input
-    std::size_t constexpr n = 64;
+    std::size_t constexpr n = 4096*4;
     std::size_t constexpr expected_degree = n >> 1;
 
     a2::edge_list_t const graph = a2::generate_graph( n, n * expected_degree );
     std::size_t const m = graph.size();
 
     // lazily echo out input graph
-    for( auto const& e : graph )
-    {
-        std::cout << "(" << e.x << "," << e.y << ") ";
-    }
+    //for( auto const& e : graph )
+    //{
+    //    std::cout << "(" << e.x << "," << e.y << ") ";
+    //}
 
     // allocate and memcpy input to device
     a2::edge_t * d_edges;
@@ -175,7 +175,7 @@ int main()
     // run your code!
     auto const expected = cpu_two_hop( graph, n );
     run_dense ( d_edges, n, m, expected);
-    run_sparse( d_edges, n, m );
+    //run_sparse( d_edges, n, m );
 
     return EXIT_SUCCESS;
 }

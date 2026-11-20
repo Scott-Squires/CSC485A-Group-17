@@ -27,6 +27,8 @@ struct DenseGraph
 
 namespace gpu {
 
+const size_t TILE_SIZE = 32;
+
 
 /**
  * Constructs a DenseGraph from an input edge list of m edges.
@@ -102,7 +104,7 @@ void two_hop_tiled( DenseGraph g, node_t * out)
     size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
 
     // Make Const expr and use same thing as block configuration size
-    const size_t TILE_SIZE = 32; // FACT CHECK THIS
+    //const size_t TILE_SIZE = 32; // FACT CHECK THIS
 
 
     size_t br = blockIdx.y; // block row
@@ -202,11 +204,14 @@ inline void run_two_hop( DenseGraph g )
     // std::size_t const threads = 256;
 
     // use same const expr here
-    std::size_t const threads = 1024;
-    std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads;
-    // two_hop_reachability<<< blocks, threads >>>( g, d_out );
+
+    dim3 const threads(TILE_SIZE, TILE_SIZE);
+    dim3 const blocks(g.n / TILE_SIZE, g.n / TILE_SIZE);
+    //size_t const threads = 256;
+    //std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads;
+    //two_hop_reachability<<< blocks, threads >>>( g, d_out );
     two_hop_tiled<<< blocks, threads >>>( g, d_out );
-    // two_hop_warp_optimizations<<< blocks, threads >>>( g, d_out );
+     //two_hop_warp_optimizations<<< blocks, threads >>>( g, d_out );
 
     cudaMemcpy( g.adjacencyMatrix, d_out, sizeof( node_t ) * g.matrix_size(), cudaMemcpyDeviceToDevice );
     cudaFree( d_out );
