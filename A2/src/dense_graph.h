@@ -101,17 +101,42 @@ void two_hop_tiled( DenseGraph g, node_t * out)
 
     size_t th_id = threadIdx.x + blockIdx.x * blockDim.x; // maybe can get rid of block part.
 
-    size_t row = th_id / g.n;
-    size_t col = th_id % g.n;
+    // Make Const expr and use same thing as block configuration size
+    const size_t TILE_SIZE = 32; // FACT CHECK THIS
 
-    if (th_id >= g.n * g.n) {
-        return;
-    }
 
-    int result = 0;
+    size_t br = blockIdx.y; // block row
+    size_t bc = blockIdx.x; // block col
 
-    for (size_t i = 0; i < g.n; i++) {
-        result += g.adjacencyMatrix[row * g.n + i] * g.adjacencyMatrix[i * g.n + col];
+    size_t tr = threadIdx.y; //  what warp number its in 0-32
+    size_t tc = threadIdx.x; // 0-32
+
+    size_t row = br * TILE_SIZE + tr;
+    size_t col = bc * TILE_SIZE + tc;
+
+    __shared__ node_t tile_a[TILE_SIZE][TILE_SIZE];
+    __shared__ node_t tile_b[TILE_SIZE][TILE_SIZE];
+
+
+    int result = 0; // thread result gets acumulated across tiles.
+
+    for (size_t i = 0; i < g.n / TILE_SIZE; i++) {
+
+      // Load values to shared memory
+        size_t a_row = row;
+        size_t a_col = i * TILE_SIZE + tc;
+
+       tile_a[tr][tc] = g.adjacencyMatrix[a_row * g.n + a_col];
+
+        size_t b_row = i * TILE_SIZE + tr;
+        size_t b_col = col;
+       tile_b[tr][tc] = g.adjacencyMatrix[b_row * g.n + b_col];
+        __syncthreads();
+      // Compute partial result for tile.
+        for (size_t k = 0; k < TILE_SIZE; k++){
+            result += tile_a[tr][k] * tile_b[k][tc];
+        }
+        __syncthreads();
     }
 
 
@@ -120,6 +145,11 @@ void two_hop_tiled( DenseGraph g, node_t * out)
         result = 0;
     } else if (result > 1) {
         result = 1;
+    }
+
+    // Only write output if in range
+    if (th_id >= g.n * g.n) {
+        return;
     }
 
     out[row * g.n + col] = result;
@@ -169,11 +199,14 @@ inline void run_two_hop( DenseGraph g )
     node_t * d_out;
     cudaMalloc( (void**)&d_out, sizeof( node_t ) * g.matrix_size() );
 
-    std::size_t const threads = 256;
+    // std::size_t const threads = 256;
+
+    // use same const expr here
+    std::size_t const threads = 1024;
     std::size_t const blocks  = ( g.matrix_size() + threads - 1 ) / threads;
-    two_hop_reachability<<< blocks, threads >>>( g, d_out );
+    // two_hop_reachability<<< blocks, threads >>>( g, d_out );
     two_hop_tiled<<< blocks, threads >>>( g, d_out );
-    two_hop_warp_optimizations<<< blocks, threads >>>( g, d_out );
+    // two_hop_warp_optimizations<<< blocks, threads >>>( g, d_out );
 
     cudaMemcpy( g.adjacencyMatrix, d_out, sizeof( node_t ) * g.matrix_size(), cudaMemcpyDeviceToDevice );
     cudaFree( d_out );
